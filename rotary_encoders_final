@@ -48,18 +48,19 @@ TIM_HandleTypeDef htim6;
 UART_HandleTypeDef huart2;
 
 /* USER CODE BEGIN PV */
-#define CPR 4096.0f
-#define SAMPLE_TIME 0.01f
-#define WHEEL_RADIUS 0.05f
-#define PI 3.14159265359f
+#define CPR 4096.0f //Counts Per Revolution του encoder, δηλαδή: 4096 counts = 1 πλήρης περιστροφή
 
-int32_t prev_count = 0;
-int32_t curr_count = 0;
-int32_t delta_count = 0;
+#define SAMPLE_TIME 0.01f //Sampling period = 0.01 sec = 10 ms
+#define WHEEL_RADIUS 0.05f //Ακτίνα τροχού = 5 cm
+#define PI 3.14159265359f //Τιμή π
 
-float omega = 0;
-float velocity = 0;
-float distance = 0;
+int32_t prev_count = 0; //Προηγούμενη μέτρηση encoder
+int32_t curr_count = 0; //Τωρινή μέτρηση encoder
+int32_t delta_count = 0; //Πόσα counts άλλαξαν από το τελευταίο sample
+
+float omega = 0; //Γωνιακή ταχύτητα rad/s.
+float velocity = 0; //Γραμμική ταχύτητα m/s
+float distance = 0; //Συνολική απόσταση σε μέτρα
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -78,19 +79,19 @@ void Encoder_Update(void);
 
 void Encoder_Update(void)
 {
-    curr_count = __HAL_TIM_GET_COUNTER(&htim2);
+    curr_count = __HAL_TIM_GET_COUNTER(&htim2); //Παίρνει την τρέχουσα τιμή του TIM2 counter
 
-    delta_count = curr_count - prev_count;
-    prev_count = curr_count;
+    delta_count = curr_count - prev_count; //Βρίσκει πόσα counts άλλαξαν από το προηγούμενο sample
+    prev_count = curr_count; //Αποθηκεύει current ως previous για το επόμενο sample
 
-    float new_omega = (delta_count / CPR) * (2.0f * PI) / SAMPLE_TIME;
+    float new_omega = (delta_count / CPR) * (2.0f * PI) / SAMPLE_TIME; //Υπολογίζει ω=(Δcounts/CPR ) 2π/Τ, οπου: Δcounts / CPR → περιστροφές, / SAMPLE_TIME → ανά δευτερόλεπτο
 
-    omega = 0.7f * omega + 0.3f * new_omega;
+    omega = 0.7f * omega + 0.3f * new_omega; //Κάνει average μεταξύ παλιάς τιμής και νέας τιμής, ώστε να μειώσει θόρυβο encoder
 
-    velocity = omega * WHEEL_RADIUS;
+    velocity = omega * WHEEL_RADIUS; //Κάνει: u=ωr
 
-    distance += (delta_count / CPR) * (2.0f * PI * WHEEL_RADIUS);
-}
+    distance += (delta_count / CPR) * (2.0f * PI * WHEEL_RADIUS); //Υπολογίζει πόση απόσταση διανύθηκε σε αυτό το sample και την προσθέτει. 
+}																  //Η σχέση είναι (Δcounts/CPR ) 2πr
 /* USER CODE END 0 */
 
 /**
@@ -127,7 +128,7 @@ int main(void)
   MX_USART2_UART_Init();
   /* USER CODE BEGIN 2 */
   HAL_TIM_Encoder_Start(&htim2, TIM_CHANNEL_ALL);
-  HAL_TIM_Base_Start_IT(&htim6);
+  HAL_TIM_Base_Start_IT(&htim6); //Το interrupt δημιουργείται από αυτή τη γραμμή και ουσιαστικά λέω στον TIM6 κάθε φορά που τελειώνει ο timer, να κάνει interrupt
   /* USER CODE END 2 */
 
   /* Initialize led */
@@ -151,8 +152,10 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-	  printf("omega=%.2f rad/s | v=%.2f m/s | s=%.2f m\r\n", omega, velocity, distance);
-	  HAL_Delay(200);
+	  printf("omega=%.2f rad/s | v=%.2f m/s | s=%.2f m\r\n", omega, velocity, distance); //Τυπώνει: γωνιακή ταχύτητα, γραμμική ταχύτητα, απόσταση μέσω UART.
+
+
+	  HAL_Delay(200); //Περιμένει 200 ms
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
@@ -364,7 +367,7 @@ static void MX_GPIO_Init(void)
 }
 
 /* USER CODE BEGIN 4 */
-void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
+void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) //Αυτό καλείται αυτόματα όταν timer κάνει overflow.
 {
     if (htim->Instance == TIM6)
     {
